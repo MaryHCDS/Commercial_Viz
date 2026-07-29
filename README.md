@@ -1,31 +1,37 @@
 # Commercial_Viz
 
-`commercial-viz` is a beginner-friendly Python library of clean,
-consulting-style visualizations for **healthcare & pharmaceutical
-commercial analytics**, built on pandas and matplotlib.
+`commercial_viz` is a lightweight Python library for healthcare and
+pharmaceutical commercial analytics built with pandas and matplotlib.
 
-## Charts
+## Features
 
-- `performance_bar` — rank categories by a metric
-- `actual_vs_target` — compare results against goals
-- `trend_line` — track a metric over time
-- `market_share` — show composition / share of total
-- `distribution_plot` — show the spread of a numeric variable
+- `performance_bar()` – compare and rank business performance across categories
+- `actual_vs_target()` – compare actual performance against goals
 
-Every function takes a pandas `DataFrame` and returns a matplotlib
-`(fig, ax)`.
+Every function accepts a pandas DataFrame and returns `(fig, ax)`.
 
-## Install
+## Installation
 
 ```bash
 pip install -e .
 ```
 
-## Usage
+## Example
 
 ```python
+import pandas as pd
 from commercial_viz import performance_bar
-```
 
-> Chart functions are not implemented yet — this is the initial package
-> scaffold.
+sales = pd.DataFrame({
+    "region": ["West", "East", "South"],
+    "revenue": [1250000, 980000, 740000]
+})
+
+fig, ax = performance_bar(
+    sales,
+    category="region",
+    value="revenue",
+    title="Regional Revenue",
+    value_format="currency"
+)
+```
