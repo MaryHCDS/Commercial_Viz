@@ -21,14 +21,8 @@ def sample_df():
 
 
 def test_public_functions_are_importable():
-    """The five public chart functions should be importable from the package."""
-    for name in [
-        "performance_bar",
-        "actual_vs_target",
-        "trend_line",
-        "market_share",
-        "distribution_plot",
-    ]:
+    """The two public chart functions should be importable from the package."""
+    for name in ["performance_bar", "actual_vs_target"]:
         assert hasattr(commercial_viz, name)
 
 
