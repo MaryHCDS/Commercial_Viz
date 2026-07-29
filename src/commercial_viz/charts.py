@@ -3,13 +3,11 @@
 Each public function accepts a pandas DataFrame and returns a matplotlib
 Figure and Axes as a tuple ``(fig, ax)``. Functions never modify the
 caller's DataFrame.
-
-NOTE: These are placeholder signatures only. The chart logic is not
-implemented yet.
 """
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.lines import Line2D
 
 # ---------------------------------------------------------------------------
 # Visual theme constants (consulting style)
@@ -19,8 +17,6 @@ import pandas as pd
 # bright teal is used only to highlight the most important result.
 NAVY = "#001F33"       # dominant color for most bars / lines
 TEAL = "#0099B8"       # selective emphasis (the key result)
-WHITE = "#FFFFFF"
-OFF_WHITE = "#F7F7F3"  # soft light background
 DARK_TEXT = "#0B2239"  # text on light backgrounds
 
 # Shared figure sizing and typography.
@@ -38,8 +34,38 @@ def _format_value(number, value_format):
     return f"{number:,.0f}"
 
 
+def _apply_theme(ax):
+    """Apply the shared consulting look to an axis.
+
+    Removes the top, right, and left spines, turns off gridlines, hides the
+    numeric x-axis (the data labels already carry the numbers), and colors
+    the category tick labels in dark navy.
+    """
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.grid(False)
+    ax.xaxis.set_visible(False)
+    ax.tick_params(left=False)
+    for label in ax.get_yticklabels():
+        label.set_color(DARK_TEXT)
+
+
+def _label_bars(ax, bars, values, value_format):
+    """Write a formatted value label just past the end of each bar."""
+    for bar, value in zip(bars, values):
+        ax.text(
+            bar.get_width(),
+            bar.get_y() + bar.get_height() / 2,
+            "  " + _format_value(value, value_format),
+            va="center",
+            ha="left",
+            color=DARK_TEXT,
+            fontsize=LABEL_FONTSIZE,
+        )
+
+
 # ---------------------------------------------------------------------------
-# Placeholder function signatures
+# Public chart functions
 # ---------------------------------------------------------------------------
 
 def performance_bar(df, category, value, title=None, value_format="number"):
@@ -88,18 +114,7 @@ def performance_bar(df, category, value, title=None, value_format="number"):
 
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
     bars = ax.barh(categories, amounts, color=bar_colors)
-
-    # Add a formatted data label just past the end of each bar.
-    for bar, amount in zip(bars, amounts):
-        ax.text(
-            bar.get_width(),
-            bar.get_y() + bar.get_height() / 2,
-            "  " + _format_value(amount, value_format),
-            va="center",
-            ha="left",
-            color=DARK_TEXT,
-            fontsize=LABEL_FONTSIZE,
-        )
+    _label_bars(ax, bars, amounts, value_format)
 
     if title:
         ax.set_title(
@@ -110,22 +125,18 @@ def performance_bar(df, category, value, title=None, value_format="number"):
             loc="left",
         )
 
-    # Remove clutter: drop spines, gridlines, and the numeric x-axis
-    # (the data labels already carry the numbers).
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ax.grid(False)
-    ax.xaxis.set_visible(False)
-    ax.tick_params(left=False)
-    for label in ax.get_yticklabels():
-        label.set_color(DARK_TEXT)
-
+    _apply_theme(ax)
     fig.tight_layout()
     return fig, ax
 
 
-def actual_vs_target(df, category, actual, target, title=None):
-    """Compare actual values against target values per category.
+def actual_vs_target(df, category, actual, target, title=None, value_format="number"):
+    """Compare actual commercial performance against a target per category.
+
+    Useful for views such as sales versus quota or prescriptions versus
+    forecast. Actual values are drawn as navy bars and each target is
+    marked with a teal vertical line, so it is easy to see who beat or
+    missed plan. The caller's DataFrame is never modified.
 
     Parameters
     ----------
@@ -134,17 +145,66 @@ def actual_vs_target(df, category, actual, target, title=None):
     category : str
         Column of category labels (e.g. ``"region"``).
     actual : str
-        Column holding actual values.
+        Column holding actual values (e.g. ``"sales"``).
     target : str
-        Column holding target values.
+        Column holding target values (e.g. ``"quota"``).
     title : str, optional
         Chart title.
+    value_format : str, default "number"
+        How to format the actual-value labels: ``"number"``,
+        ``"currency"``, or ``"percent"``.
 
     Returns
     -------
     (matplotlib.figure.Figure, matplotlib.axes.Axes)
     """
-    raise NotImplementedError
+    # Validate inputs with clear, specific errors.
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pandas DataFrame.")
+    if df.empty:
+        raise ValueError("df must not be empty.")
+    for column_name in (category, actual, target):
+        if column_name not in df.columns:
+            raise ValueError(f"Column '{column_name}' is not in the DataFrame.")
+
+    # Total actual and target per category, then sort by actual so the
+    # strongest performer sits at the top of the horizontal chart.
+    totals = df.groupby(category)[[actual, target]].sum().sort_values(actual)
+    categories = list(totals.index)
+    actual_values = list(totals[actual].values)
+    target_values = list(totals[target].values)
+
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+    bars = ax.barh(categories, actual_values, color=NAVY)
+
+    # Draw each target as a short teal vertical line across its bar.
+    for bar, target_value in zip(bars, target_values):
+        ax.vlines(
+            target_value,
+            bar.get_y(),
+            bar.get_y() + bar.get_height(),
+            color=TEAL,
+            linewidth=3,
+        )
+
+    _label_bars(ax, bars, actual_values, value_format)
+
+    # A small, frameless legend explains what the teal marker means.
+    target_marker = Line2D([0], [0], color=TEAL, linewidth=3, label="Target")
+    ax.legend(handles=[target_marker], loc="lower right", frameon=False)
+
+    if title:
+        ax.set_title(
+            title,
+            fontsize=TITLE_FONTSIZE,
+            fontweight="bold",
+            color=DARK_TEXT,
+            loc="left",
+        )
+
+    _apply_theme(ax)
+    fig.tight_layout()
+    return fig, ax
 
 
 def trend_line(df, date, value, group=None, marker_date=None, title=None):

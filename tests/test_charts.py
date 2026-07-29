@@ -7,7 +7,7 @@ import pytest
 matplotlib.use("Agg")  # non-interactive backend for testing
 
 import commercial_viz
-from commercial_viz.charts import performance_bar
+from commercial_viz.charts import actual_vs_target, performance_bar
 
 
 def sample_df():
@@ -82,3 +82,58 @@ def test_rejects_empty_dataframe():
 def test_rejects_missing_columns():
     with pytest.raises(ValueError):
         performance_bar(sample_df(), "region", "missing_column")
+
+
+# ---------------------------------------------------------------------------
+# actual_vs_target
+# ---------------------------------------------------------------------------
+
+def target_df():
+    """Sales versus quota by region (with a repeat region to aggregate)."""
+    return pd.DataFrame(
+        {
+            "region": ["West", "East", "South", "West"],
+            "sales": [100, 250, 175, 50],
+            "quota": [120, 200, 180, 30],
+        }
+    )
+
+
+def test_avt_returns_fig_and_ax_and_marks_targets():
+    """actual_vs_target returns (fig, ax), navy bars, and teal target lines."""
+    from commercial_viz.charts import NAVY, TEAL
+
+    fig, ax = actual_vs_target(target_df(), "region", "sales", "quota")
+    assert fig.__class__.__name__ == "Figure"
+    assert ax.__class__.__name__ in ("Axes", "AxesSubplot")
+
+    # Actual bars are navy; sorted by actual (West=150), so West on top.
+    bar_colors = {matplotlib.colors.to_hex(b.get_facecolor()).upper() for b in ax.patches}
+    assert bar_colors == {NAVY}
+    widths = [bar.get_width() for bar in ax.patches]
+    assert widths == [150.0, 175.0, 250.0]
+
+    # Each target is drawn as a teal LineCollection (one per category).
+    teal_lines = [
+        c for c in ax.collections
+        if matplotlib.colors.to_hex(c.get_color()[0]).upper() == TEAL
+    ]
+    assert len(teal_lines) == 3
+
+
+def test_avt_rejects_missing_columns():
+    with pytest.raises(ValueError):
+        actual_vs_target(target_df(), "region", "sales", "missing_target")
+
+
+def test_avt_rejects_empty_dataframe():
+    empty = pd.DataFrame({"region": [], "sales": [], "quota": []})
+    with pytest.raises(ValueError):
+        actual_vs_target(empty, "region", "sales", "quota")
+
+
+def test_avt_does_not_modify_caller_dataframe():
+    df = target_df()
+    before = df.copy()
+    actual_vs_target(df, "region", "sales", "quota")
+    pd.testing.assert_frame_equal(df, before)
