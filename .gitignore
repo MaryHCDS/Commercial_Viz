@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated example chart outputs (from examples/demo.py).
+# Intentional documentation images (e.g. under docs/ or images/) can
+# still be committed via the negations below.
+*.png
+!docs/**/*.png
+!images/**/*.png
